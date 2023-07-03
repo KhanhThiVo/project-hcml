@@ -2,7 +2,7 @@ import csv
 import numpy as np
 import os
 import time
-
+import matplotlib.pyplot as plt
 
 class ExhaustiveBaseline:
 
@@ -37,18 +37,23 @@ class ExhaustiveBaseline:
                 data[row[0]] = row[1]
         return data
 
-    def run_search(self, identities_path, probes_path, gallery_path):
+    def run_search(self, identities_path, probes_path, gallery_path,penetration_rate):
         start_time = time.time()
         probes_list = []
         gallery_list = []
         probe_embeddings = []
         gallery_embeddings = []
         identities = self.open_tab_separated_file(identities_path)
+
+        gallery_files=os.listdir(gallery_path)
+        np.random.seed(42)
+        np.random.shuffle(gallery_files)
+        gallery_files=gallery_files[:int(len(gallery_files)*penetration_rate)]
         for probe in os.listdir(probes_path):
             if probe.endswith('.npy'):
                 probes_list.append(probe)
                 probe_embeddings.append(np.load(os.path.join(probes_path, probe)))
-        for gallery in os.listdir(gallery_path):
+        for gallery in gallery_files:
             if gallery.endswith('.npy'):
                 gallery_list.append(gallery)
                 gallery_embeddings.append(np.load(os.path.join(gallery_path, gallery)))
@@ -72,11 +77,31 @@ class ExhaustiveBaseline:
         return hit_rate, end_time - start_time       
     
 if __name__ == '__main__':
+    seed=42
+    
     fpath = os.path.dirname(__file__)
-    data_path = os.path.join(fpath, 'IJBC_Split')
+    data_path = fpath
     identities_path = os.path.join(data_path, 'identities.txt')
     probes_path = os.path.join(data_path, 'Probe')
-    gallery_path = os.path.join(data_path, 'Gallery')
+    gallery_path = os.path.join(data_path, 'Gallery/Gallery')
 
     baseline = ExhaustiveBaseline()
-    hit_rate, time_ran = baseline.run_search(identities_path, probes_path, gallery_path)
+    hit_rates=[]
+    penetration_rates=[]
+    for penetration_rate in np.arange(0.01,1.01,0.01):
+        penetration_rate=np.around(penetration_rate,2)
+        print('penetration_rate= '+str(penetration_rate))
+        hit_rate, time_ran = baseline.run_search(identities_path, probes_path, gallery_path,penetration_rate)
+        print('hit_rate= '+str(hit_rate))
+        hit_rates.append(hit_rate)
+        penetration_rates.append(penetration_rate)
+    root_name='random_search'+str(seed)
+    np.save(root_name+'_penetration_rates.npy',np.array(penetration_rates))
+    np.save(root_name+'_hit_rates.npy',np.array(hit_rates))
+    plt.plot(penetration_rates,hit_rates)
+    plt.xlabel('Penetration Rate')
+    plt.ylabel('Hit Rate')
+    plt.savefig('Random_Indexing.png')
+    plt.show()
+
+
