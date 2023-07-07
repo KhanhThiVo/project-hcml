@@ -20,7 +20,7 @@ class ProductQuantization:
         self.probes_path = probes_path
         self.gallery_path = gallery_path
 
-    def product_quantization(self, data, num_subspaces, num_centroids):
+    """def product_quantization(self, data, num_subspaces, num_centroids):
         num_samples, dim = data.shape
         # subspace_dim = dim // num_subspaces
 
@@ -44,7 +44,7 @@ class ProductQuantization:
         quantized_codes = np.concatenate(quantized_codes, axis=1)
         codebooks = np.concatenate(codebooks)
 
-        return quantized_codes, codebooks
+        return quantized_codes, codebooks"""
 
     def PQ_train(self, vectors, num_subspaces, num_centroids):
         segment_length = int(vectors.shape[1] / num_subspaces)  # Dimension (or length) of a segment.
