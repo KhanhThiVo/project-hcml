@@ -32,3 +32,25 @@ def load_data(probes_path, gallery_path, penetration_rate):
             gallery_embeddings.append(np.load(os.path.join(gallery_path, gallery)))
     print("Data loaded")
     return probes_list, np.array(probe_embeddings), gallery_list, np.array(gallery_embeddings)
+
+
+def load_data_all(probes_path, gallery_path):
+    probes_list = []
+    gallery_list = []
+    probe_embeddings = []
+    gallery_embeddings = []
+
+    gallery_files = os.listdir(gallery_path)
+    np.random.seed(42)
+    np.random.shuffle(gallery_files)
+
+    for probe in os.listdir(probes_path):
+        if probe.endswith('.npy'):
+            probes_list.append(probe)
+            probe_embeddings.append(np.load(os.path.join(probes_path, probe)))
+    for gallery in gallery_files:
+        if gallery.endswith('.npy'):
+            gallery_list.append(gallery)
+            gallery_embeddings.append(np.load(os.path.join(gallery_path, gallery)))
+    print("Data loaded")
+    return probes_list, np.array(probe_embeddings), gallery_list, np.array(gallery_embeddings)
