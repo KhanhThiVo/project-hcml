@@ -31,7 +31,7 @@ class ExhaustiveBaseline:
             similarities.append(similarity)
         similarities_order = np.array(similarities)
         similarities_order = np.argsort(similarities_order).tolist()
-        candidates = similarities_order[:int(len(similarities_order) * penetration_rate)]
+        candidates = similarities_order[-int(len(similarities_order) * penetration_rate):]
         # identifications.append((probe_idx, best_match_idx))
         return candidates
 
