@@ -92,6 +92,7 @@ class ProductQuantization:
             
         distances, data_indices = tree.query(query_code, k=k)
         #extract nearest_pq_codes
+        deneme_indices=np.unique(data_indices)
         PQ_code=PQ_code[data_indices][0]
         N, M = PQ_code.shape
         distance_table = distance_table.T  # Transpose the distance table to shape (k, M)
@@ -101,7 +102,8 @@ class ProductQuantization:
             for m in range(M):
                 distances[n] += distance_table[PQ_code[n][m]][m]  # Sum the partial distances from all the segments.
         #print("Done search")
-        return distance_table, distances
+        
+        return distance_table, distances,data_indices
 
     def run_search(self, penetration_rate: float):
         start_time = time.time()
@@ -118,12 +120,13 @@ class ProductQuantization:
             # best_match_idx = None
             # min_distance = np.inf
 
-            distance_table, distances = pq_model.PQ_search(probe_embedding, codebook, PQ_code,tree,k=len(gallery_list))
+            distance_table, distances,data_indices = pq_model.PQ_search(probe_embedding, codebook, PQ_code,tree,k=50)
             min_distance = np.min(distances)
-            best_match_idx = np.argmin(distances)
+            best_match_idx = data_indices[0][np.argmin(distances)]
             identifications.append((probe_idx, best_match_idx))
 
         # Evaluation
+        print(tree.get_tree_stats())
         correct_preds = 0
         total_preds = 0
         for probe_idx, gallery_idx in identifications:
