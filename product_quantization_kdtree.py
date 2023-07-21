@@ -10,6 +10,7 @@ from scipy.cluster.vq import kmeans2, vq
 from scipy.spatial.distance import cdist
 import utils
 from sklearn.neighbors import KDTree
+from scipy.spatial import cKDTree
 
 class ProductQuantization:
 
@@ -67,10 +68,11 @@ class ProductQuantization:
             PQ_code[:, m] = centroid_ids  # Assign centroid Ids to PQ_code.
             index[m] = centroid_ids
         print("Done encoding")
-        tree = KDTree(PQ_code)
-        return PQ_code,tree
+        tree_1=KDTree(PQ_code,leaf_size=2)
+        tree = cKDTree(PQ_code,leafsize=2,balanced_tree=True)
+        return PQ_code,tree,tree_1
 
-    def PQ_search(self, query_vector, codebook, PQ_code,tree,k):
+    def PQ_search(self, query_vector, codebook, PQ_code,tree,tree_1,k,max_penetration_rate,verbose=1):
         num_subspaces, num_centroids, s = codebook.shape
         # =====================================================================
         # Build the distance table.
@@ -89,10 +91,15 @@ class ProductQuantization:
         # =====================================================================
         
 
-            
+        distances, data_indices = tree_1.query(query_code, k=k)
         distances, data_indices = tree.query(query_code, k=k)
+        n_calls=tree_1.get_n_calls()
+        arrays=tree_1.get_arrays()
+        size=len(arrays[2])*len(arrays[3]) # The size depends on these parameters.
+        if n_calls/size>max_penetration_rate:
+            max_penetration_rate=n_calls/size
         #extract nearest_pq_codes
-        deneme_indices=np.unique(data_indices)
+        tree_1.reset_n_calls()
         PQ_code=PQ_code[data_indices][0]
         N, M = PQ_code.shape
         distance_table = distance_table.T  # Transpose the distance table to shape (k, M)
@@ -103,7 +110,7 @@ class ProductQuantization:
                 distances[n] += distance_table[PQ_code[n][m]][m]  # Sum the partial distances from all the segments.
         #print("Done search")
         
-        return distance_table, distances,data_indices
+        return distance_table, distances,data_indices,max_penetration_rate
 
     def run_search(self, penetration_rate: float):
         start_time = time.time()
@@ -112,21 +119,23 @@ class ProductQuantization:
         identities = utils.open_tab_separated_file(self.identities_path)
 
         codebook = self.PQ_train(gallery_embeddings, self.num_subspaces, self.num_centroids)
-        PQ_code,tree = pq_model.PQ_encode(gallery_embeddings, codebook)
+        PQ_code,tree,tree_1 = pq_model.PQ_encode(gallery_embeddings, codebook)
 
         identifications = []
-
+        max_penetration_rate=0
         for probe_idx, probe_embedding in enumerate(tqdm(probe_embeddings)):
             # best_match_idx = None
             # min_distance = np.inf
-
-            distance_table, distances,data_indices = pq_model.PQ_search(probe_embedding, codebook, PQ_code,tree,k=50)
+            if probe_idx==0:
+                verbose=1
+            else:
+                verbose=0
+            distance_table, distances,data_indices,max_penetration_rate = pq_model.PQ_search(probe_embedding, codebook, PQ_code,tree,tree_1,5,max_penetration_rate,verbose=verbose)
             min_distance = np.min(distances)
             best_match_idx = data_indices[0][np.argmin(distances)]
             identifications.append((probe_idx, best_match_idx))
-
-        # Evaluation
-        print(tree.get_tree_stats())
+        print('max penetration rate',max_penetration_rate)
+        #  Evaluation
         correct_preds = 0
         total_preds = 0
         for probe_idx, gallery_idx in identifications:
