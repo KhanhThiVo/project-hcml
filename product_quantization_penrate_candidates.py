@@ -17,8 +17,6 @@ class ProductQuantization:
         self.num_subspaces = num_subspaces
         self.num_centroids = num_centroids
         self.identities_path = identities_path
-        # self.probes_path = probes_path
-        # self.gallery_path = gallery_path
 
         self.probes_list, self.probe_embeddings, self.gallery_list, self.gallery_embeddings = utils.load_data_all(probes_path,
                                                                                               gallery_path)
@@ -50,20 +48,15 @@ class ProductQuantization:
 
     def PQ_search(self, query_vector, codebook, PQ_code):
         num_subspaces, num_centroids, s = codebook.shape
-        # =====================================================================
-        # Build the distance table.
-        # =====================================================================
 
+        # Create distance table
         distance_table = np.empty((num_subspaces, num_centroids), np.float32)  # Shape is (M, k)
 
         for m in range(num_subspaces):
             query_segment = query_vector[m * s:(m + 1) * s]  # Query vector for segment m.
             distance_table[m] = cdist([query_segment], codebook[m], "sqeuclidean")[0]
 
-        # =====================================================================
-        # Look up the partial distances from the distance table.
-        # =====================================================================
-
+        # Get distances from distance table
         N, M = PQ_code.shape
         distance_table = distance_table.T  # Transpose the distance table to shape (k, M)
         distances = np.zeros((N,)).astype(np.float32)
@@ -113,26 +106,9 @@ class ProductQuantization:
 
         return hit_rate, end_time - start_time
 
-    """    
-    M = 8  # Number of segments
-    k = 256  # Number of centroids per segment
-    vector_dim = 128  # Dimension (length) of a vector
-    total_vectors = 1000000  # Number of database vectors
-    
-    # Generate random vectors
-    np.random.seed(42)
-    vectors = np.random.random((total_vectors, vector_dim)).astype(np.float32)  # Database vectors
-    q = np.random.random((vector_dim,)).astype(np.float32)  # Query vector
-    
-    # Train, encode and search with Product Quantization
-    codebook = PQ_train(vectors, M, k)
-    PQ_code = PQ_encode(vectors, codebook)
-    distance_table, distances = PQ_search(q, codebook, PQ_code)
-    # All the distances are returned, you may sort them to get the shortest distance.
-    """
-
 
 if __name__ == '__main__':
+
     seed = 142
 
     fpath = os.path.dirname(__file__)
@@ -150,20 +126,24 @@ if __name__ == '__main__':
 
     hit_rates = []
     penetration_rates = []
-    for penetration_rate in np.arange(0.001, 0.005, 0.001):  # step=0.01
-        penetration_rate = np.around(penetration_rate, 3)
+    total_start_time = time.time()
+    for penetration_rate in np.arange(0.001, 0.05, 0.0075):  # step=0.01
+        penetration_rate = np.around(penetration_rate, 5)
         print('penetration_rate= ' + str(penetration_rate))
-        hit_rate, time_ran = pq_model.run_search(penetration_rate)
+        hit_rate, time_ran_search = pq_model.run_search(penetration_rate)
         print('hit_rate= ' + str(hit_rate))
-        print(f'time ran: {time_ran}')
+        print(f'time ran: {time_ran_search}')
         hit_rates.append(hit_rate)
         penetration_rates.append(penetration_rate)
+    total_end_time = time.time()
+    total_time = total_end_time - total_start_time
+    print(f"total time:{total_time}")
     root_name = 'product_quantization' + str(seed)
     np.save(root_name + '_penetration_rates.npy', np.array(penetration_rates))
     np.save(root_name + '_hit_rates.npy', np.array(hit_rates))
     plt.plot(penetration_rates, hit_rates)
     plt.xlabel('Penetration Rate')
     plt.ylabel('Hit Rate')
-    plt.savefig('Random_Indexing.png')
+    plt.savefig('eval-pq.png')
     plt.show()
 

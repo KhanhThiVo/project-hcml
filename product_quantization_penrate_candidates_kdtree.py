@@ -102,8 +102,6 @@ class ProductQuantization:
             distances_order = np.argsort(distances).tolist()
 
             # Get candidates according to penetration rate
-            # min_distance = np.min(distances)
-            # best_match_idx = np.argmin(distances)
             candidates = distances_order[:int(len(distances_order) * penetration_rate)]
             candidates = data_indices.tolist()[0]
             identifications.append((probe_idx, candidates))
@@ -126,24 +124,6 @@ class ProductQuantization:
 
         return hit_rate, end_time - start_time
 
-    """    
-    M = 8  # Number of segments
-    k = 256  # Number of centroids per segment
-    vector_dim = 128  # Dimension (length) of a vector
-    total_vectors = 1000000  # Number of database vectors
-    
-    # Generate random vectors
-    np.random.seed(42)
-    vectors = np.random.random((total_vectors, vector_dim)).astype(np.float32)  # Database vectors
-    q = np.random.random((vector_dim,)).astype(np.float32)  # Query vector
-    
-    # Train, encode and search with Product Quantization
-    codebook = PQ_train(vectors, M, k)
-    PQ_code = PQ_encode(vectors, codebook)
-    distance_table, distances = PQ_search(q, codebook, PQ_code)
-    # All the distances are returned, you may sort them to get the shortest distance.
-    """
-
 
 if __name__ == '__main__':
     seed = 143
@@ -163,7 +143,8 @@ if __name__ == '__main__':
 
     hit_rates = []
     penetration_rates = []
-    for penetration_rate in np.arange(0.001, 0.26, 0.025):  # 0.001, 0.005, 0.001
+    total_start_time = time.time()
+    for penetration_rate in np.arange(0.001, 0.35, 0.005):  # 0.001, 0.005, 0.001
         penetration_rate = np.around(penetration_rate, 3)
         print('penetration_rate= ' + str(penetration_rate))
         hit_rate, time_ran = pq_model.run_search(penetration_rate)
@@ -172,13 +153,15 @@ if __name__ == '__main__':
         hit_rates.append(hit_rate)
         penetration_rates.append(penetration_rate)
         total_time_ran += time_ran
-    print(f"Total time ran: {total_time_ran}")
+    total_end_time = time.time()
+    total_time = total_end_time - total_start_time
+    print(f"Total time ran: {total_time}")
     root_name = 'product_quantization' + str(seed)
     np.save(root_name + '_penetration_rates.npy', np.array(penetration_rates))
     np.save(root_name + '_hit_rates.npy', np.array(hit_rates))
     plt.plot(penetration_rates, hit_rates)
     plt.xlabel('Penetration Rate')
     plt.ylabel('Hit Rate')
-    plt.savefig('Random_Indexing.png')
+    plt.savefig('eval-pq_kdtree.png')
     plt.show()
 

@@ -11,8 +11,6 @@ class ExhaustiveBaseline:
 
     def __init__(self, identities_path, probes_path, gallery_path):
         self.identities_path = identities_path
-        # self.probes_path = probes_path
-        # self.gallery_path = gallery_path
 
         self.probes_list, self.probe_embeddings, self.gallery_list, self.gallery_embeddings = utils.load_data_all(
             probes_path,
@@ -77,20 +75,25 @@ if __name__ == '__main__':
 
     hit_rates = []
     penetration_rates = []
-    for penetration_rate in np.arange(0.001, 0.005, 0.001):
+    total_start_time = time.time()
+    for penetration_rate in np.arange(0.001, 0.05, 0.0075):
         penetration_rate = np.around(penetration_rate, 3)
         print('penetration_rate= '+str(penetration_rate))
-        hit_rate, time_ran = baseline_model.run_search(penetration_rate)
+        hit_rate, time_ran_search = baseline_model.run_search(penetration_rate)
         print('hit_rate= '+str(hit_rate))
+        print(f'time ran: {time_ran_search}')
         hit_rates.append(hit_rate)
         penetration_rates.append(penetration_rate)
+    total_end_time = time.time()
+    total_time = total_end_time - total_start_time
+    print(f"total time:{total_time}")
     root_name='random_search'+str(seed)
     np.save(root_name+'_penetration_rates.npy',np.array(penetration_rates))
     np.save(root_name+'_hit_rates.npy',np.array(hit_rates))
     plt.plot(penetration_rates,hit_rates)
     plt.xlabel('Penetration Rate')
     plt.ylabel('Hit Rate')
-    plt.savefig('Random_Indexing.png')
+    plt.savefig('eval-exhaustive.png')
     plt.show()
 
 

@@ -1,0 +1,23 @@
+Exhaustive search
+Penrate range: 0.001, 0.05, 0.0075
+Loops: 7
+Total run time: 2983.8830287456512
+Average run time per loop: 426.2690041065216
+Average run time per query: 0.021796236851588772
+Plot: eval-exhaustive.png
+
+PQ
+Penrate range: 0.001, 0.05, 0.0075
+Loops: 7
+Total run time: 2115.6295835971832
+Average run time per loop: 302.23279765674044
+Average run time per query: 0.015453944759254509
+Plot: eval-pq.png
+
+PQ with KDTree
+Penrate range: 0.001, 0.35, 0.005
+Loops: 70
+Total run time: 1343.2304725646973
+Average run time per loop: 191.89006750924247
+Average run time per query: 0.009811835532507158
+Plot: eval-pq_kdtree.png
