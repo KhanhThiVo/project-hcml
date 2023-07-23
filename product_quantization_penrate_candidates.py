@@ -1,11 +1,11 @@
-import csv
+# References:
+# product quantization code from https://towardsdatascience.com/product-quantization-for-similarity-search-2f1f67c5fddd
+
 import numpy as np
-import pandas as pd
 import os
 import time
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
 from scipy.cluster.vq import kmeans2, vq
 from scipy.spatial.distance import cdist
 import utils
@@ -82,10 +82,7 @@ class ProductQuantization:
             distances_order = np.argsort(distances).tolist()
 
             # Get candidates according to penetration rate
-            # min_distance = np.min(distances)
-            # best_match_idx = np.argmin(distances)
             candidates = distances_order[:int(len(distances_order) * penetration_rate)]
-            # candidates.append(distances_order)
             identifications.append((probe_idx, candidates))
 
         # Evaluation
@@ -117,8 +114,6 @@ if __name__ == '__main__':
     probes_path = os.path.join(data_path, 'Probe')
     gallery_path = os.path.join(data_path, 'Gallery')
 
-    # probes_list, probe_embeddings, gallery_list, gallery_embeddings = load_data(probes_path, gallery_path, penetration_rate=1.0)
-
     M = 8  # Number of subspaces
     k = 256  # Number of centroids per subspace
 
@@ -127,7 +122,7 @@ if __name__ == '__main__':
     hit_rates = []
     penetration_rates = []
     total_start_time = time.time()
-    for penetration_rate in np.arange(0.001, 0.05, 0.0075):  # step=0.01
+    for penetration_rate in np.arange(0.001, 0.05, 0.0075):
         penetration_rate = np.around(penetration_rate, 5)
         print('penetration_rate= ' + str(penetration_rate))
         hit_rate, time_ran_search = pq_model.run_search(penetration_rate)

@@ -1,4 +1,3 @@
-import csv
 import numpy as np
 import os
 import time
@@ -30,7 +29,6 @@ class ExhaustiveBaseline:
         similarities_order = np.array(similarities)
         similarities_order = np.argsort(similarities_order).tolist()
         candidates = similarities_order[-int(len(similarities_order) * penetration_rate):]
-        # identifications.append((probe_idx, best_match_idx))
         return candidates
 
     def run_search(self, penetration_rate: float):

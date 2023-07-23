@@ -1,15 +1,13 @@
-import csv
+# References:
+# product quantization code from https://towardsdatascience.com/product-quantization-for-similarity-search-2f1f67c5fddd
+
 import numpy as np
-import pandas as pd
 import os
 import time
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
 from scipy.cluster.vq import kmeans2, vq
-from scipy.spatial.distance import cdist
 import utils
-from sklearn.neighbors import KDTree
 from scipy.spatial import cKDTree
 
 
@@ -19,8 +17,6 @@ class ProductQuantization:
         self.num_subspaces = num_subspaces
         self.num_centroids = num_centroids
         self.identities_path = identities_path
-        # self.probes_path = probes_path
-        # self.gallery_path = gallery_path
 
         self.probes_list, self.probe_embeddings, self.gallery_list, self.gallery_embeddings = utils.load_data_all(probes_path,
                                                                                               gallery_path)
@@ -48,41 +44,24 @@ class ProductQuantization:
             centroid_ids, _ = vq(sub_vectors, codebook[m])  # vq returns the nearest centroid Ids.
             PQ_code[:, m] = centroid_ids  # Assign centroid Ids to PQ_code.
         print("Done encoding")
-        # KD tree stuffs
+        # build KD tree
         tree = cKDTree(PQ_code, leafsize=2, balanced_tree=True)
         return PQ_code, tree
 
-    def PQ_search(self, query_vector, PQ_code, k=5):
+    def PQ_search(self, query_vector, k=5):
         num_subspaces, num_centroids, s = self.codebook.shape
-        # =====================================================================
-        # Build the distance table.
-        # =====================================================================
 
-        distance_table = np.empty((num_subspaces, num_centroids), np.float32)  # Shape is (M, k)
         query_code = np.empty((1, num_subspaces), np.uint8)
 
         for m in range(num_subspaces):
             query_segment = query_vector[m * s:(m + 1) * s]  # Query vector for segment m.
-            # KDtree stuffs
             centroid_ids, _ = vq(np.expand_dims(query_segment, axis=0),
                                  self.codebook[m])  # vq returns the nearest centroid Ids.
             query_code[:, m] = centroid_ids
-            # distance_table[m] = cdist([query_segment], codebook[m], "sqeuclidean")[0]
 
-        # KD tree stuffs
+        # KD tree query
         distances, data_indices = self.kdtree.query(query_code, k=k)
-        # PQ_code = PQ_code[data_indices][0]
 
-        # Look up the partial distances from the distance table.
-        # N, M = PQ_code.shape
-        # distance_table = distance_table.T  # Transpose the distance table to shape (k, M)
-        # distances = np.zeros((N,)).astype(np.float32)
-
-        # for n in range(N):  # For each PQ Code, lookup the partial distances.
-        #     for m in range(M):
-        #         distances[n] += distance_table[PQ_code[n][m]][m]  # Sum the partial distances from all the segments.
-        # print("Done search")
-        # return distance_table, distances
         return data_indices, distances
 
     def run_search(self, penetration_rate: float):
@@ -90,19 +69,16 @@ class ProductQuantization:
 
         identifications = []
         k = int(len(self.gallery_list) * penetration_rate)
-        print(f"knn: {k}")
+        # print(f"knn: {k}")
         for probe_idx, probe_embedding in enumerate(tqdm(self.probe_embeddings)):
-            # candidates = []
 
             # Do PQ search
-            # distance_table, distances = self.PQ_search(probe_embedding, self.codebook, self.PQ_code)
-            data_indices, distances = self.PQ_search(probe_embedding, self.PQ_code, k=k)
+            data_indices, distances = self.PQ_search(probe_embedding, k=k)
 
             # Sort distances
             distances_order = np.argsort(distances).tolist()
 
             # Get candidates according to penetration rate
-            candidates = distances_order[:int(len(distances_order) * penetration_rate)]
             candidates = data_indices.tolist()[0]
             identifications.append((probe_idx, candidates))
 
@@ -133,8 +109,6 @@ if __name__ == '__main__':
     identities_path = os.path.join(data_path, 'identities.txt')
     probes_path = os.path.join(data_path, 'Probe')
     gallery_path = os.path.join(data_path, 'Gallery')
-
-    # probes_list, probe_embeddings, gallery_list, gallery_embeddings = load_data(probes_path, gallery_path, penetration_rate=1.0)
 
     M = 8  # Number of subspaces
     k = 256  # Number of centroids per subspace
