@@ -11,6 +11,8 @@ from scipy.spatial.distance import cdist
 import utils
 from sklearn.neighbors import KDTree
 
+# References:
+# product quantization code from https://towardsdatascience.com/product-quantization-for-similarity-search-2f1f67c5fddd
 class ProductQuantization:
 
     def __init__(self, num_subspaces, num_centroids, identities_path, probes_path, gallery_path):
@@ -19,32 +21,6 @@ class ProductQuantization:
         self.identities_path = identities_path
         self.probes_path = probes_path
         self.gallery_path = gallery_path
-
-    """def product_quantization(self, data, num_subspaces, num_centroids):
-        num_samples, dim = data.shape
-        # subspace_dim = dim // num_subspaces
-
-        # Split the data into subspaces
-        subspaces = np.split(data, num_subspaces, axis=1)
-
-        # Perform quantization for each subspace
-        quantized_codes = []
-        codebooks = []
-
-        for subspace_data in subspaces:
-            # Apply K-means clustering to quantize the subspace data
-            kmeans = KMeans(n_clusters=num_centroids)
-            kmeans.fit(subspace_data)
-            quantized_subspace = kmeans.predict(subspace_data)
-
-            quantized_codes.append(quantized_subspace)
-            codebooks.append(kmeans.cluster_centers_)
-
-        # Combine the quantized codes of all subspaces
-        quantized_codes = np.concatenate(quantized_codes, axis=1)
-        codebooks = np.concatenate(codebooks)
-
-        return quantized_codes, codebooks"""
 
     def PQ_train(self, vectors, num_subspaces, num_centroids):
         segment_length = int(vectors.shape[1] / num_subspaces)  # Dimension (or length) of a segment.
@@ -67,7 +43,7 @@ class ProductQuantization:
             PQ_code[:, m] = centroid_ids  # Assign centroid Ids to PQ_code.
             index[m] = centroid_ids
         print("Done encoding")
-        tree=KDTree(PQ_code,leaf_size=2)
+        tree=KDTree(PQ_code,leaf_size=1)
         return PQ_code,tree
 
     def PQ_search(self, query_vector, codebook, PQ_code,tree,k,max_penetration_rate):
@@ -140,6 +116,7 @@ class ProductQuantization:
             total_preds += 1
         hit_rate = correct_preds / total_preds
         end_time = time.time()
+        print('elapsed time in seconds:', end_time-start_time)
 
         return hit_rate, end_time - start_time, max_penetration_rate
 
@@ -163,24 +140,27 @@ if __name__ == '__main__':
     hit_rates = []
     penetration_rates = []
     max_penetration_rate=0
-    while max_penetration_rate<0.8:
+    while max_penetration_rate<0.8: # Iterate to 80 percent penetration rate. It takes a lot of time until it gets to 80%
         print('nearest neighbour= ' + str(tree_k))
         hit_rate, time_ran,max_penetration_rate = pq_model.run_search(tree_k,probe_embeddings,codebook,PQ_code,tree,probes_list,gallery_list,identities)
         print('hit_rate= ' + str(hit_rate))
+        print()
         hit_rates.append(hit_rate)
         penetration_rates.append(max_penetration_rate)
         total_time_ran += time_ran
         if tree_k==1:
-            tree_k+=9
+            tree_k+=199
         else:
-            tree_k+=10
+            tree_k+=200
+        if tree_k>=len(gallery_list):  # If nearest neighbour is close to the number of lenght of the gallery list do not wait to reach the pre specified pen rate
+            break
     print(f"Total time ran: {total_time_ran}")
     root_name = 'product_quantization' + str(seed)
-    np.save(root_name + '_penetration_rates.npy', np.array(penetration_rates))
-    np.save(root_name + '_hit_rates.npy', np.array(hit_rates))
+    np.save(root_name + '_leafsize_1_penetration_rates.npy', np.array(penetration_rates))
+    np.save(root_name + '_leafsize_1hit_rates.npy', np.array(hit_rates))
     plt.plot(penetration_rates, hit_rates)
     plt.xlabel('Penetration Rate')
     plt.ylabel('Hit Rate')
-    plt.savefig('PQ_with_kdtree.png')
+    plt.savefig('PQ_with_kdtree_leafsize_1.png')
     plt.show()
 

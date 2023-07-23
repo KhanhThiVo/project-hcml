@@ -79,4 +79,8 @@ if __name__ == '__main__':
     gallery_path = os.path.join(data_path, 'Gallery')
 
     baseline = ExhaustiveBaseline()
+    start_time=time.time()
     hit_rate, time_ran = baseline.run_search(identities_path, probes_path, gallery_path)
+    end_time=time.time()
+    print('elapsed time:',end_time-start_time)
+    print('hit rate:',hit_rate)
