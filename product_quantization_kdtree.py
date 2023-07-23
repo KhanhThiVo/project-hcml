@@ -10,7 +10,6 @@ from scipy.cluster.vq import kmeans2, vq
 from scipy.spatial.distance import cdist
 import utils
 from sklearn.neighbors import KDTree
-from scipy.spatial import cKDTree
 
 class ProductQuantization:
 
@@ -68,11 +67,10 @@ class ProductQuantization:
             PQ_code[:, m] = centroid_ids  # Assign centroid Ids to PQ_code.
             index[m] = centroid_ids
         print("Done encoding")
-        tree_1=KDTree(PQ_code,leaf_size=2)
-        tree = cKDTree(PQ_code,leafsize=2,balanced_tree=True)
-        return PQ_code,tree,tree_1
+        tree=KDTree(PQ_code,leaf_size=2)
+        return PQ_code,tree
 
-    def PQ_search(self, query_vector, codebook, PQ_code,tree,tree_1,k,max_penetration_rate,verbose=1):
+    def PQ_search(self, query_vector, codebook, PQ_code,tree,k,max_penetration_rate):
         num_subspaces, num_centroids, s = codebook.shape
         # =====================================================================
         # Build the distance table.
@@ -91,15 +89,15 @@ class ProductQuantization:
         # =====================================================================
         
 
-        distances, data_indices = tree_1.query(query_code, k=k)
         distances, data_indices = tree.query(query_code, k=k)
-        n_calls=tree_1.get_n_calls()
-        arrays=tree_1.get_arrays()
-        size=len(arrays[2])*len(arrays[3]) # The size depends on these parameters.
+        n_calls=tree.get_n_calls()
+        arrays=tree.get_arrays()
+        # scipy kdtree has the attrşbute of size. Tried different leaf sizes and got the same size when m multiplying the length of these 2 arrays.
+        size=len(arrays[2])*len(arrays[3]) 
         if n_calls/size>max_penetration_rate:
             max_penetration_rate=n_calls/size
         #extract nearest_pq_codes
-        tree_1.reset_n_calls()
+        tree.reset_n_calls()
         PQ_code=PQ_code[data_indices][0]
         N, M = PQ_code.shape
         distance_table = distance_table.T  # Transpose the distance table to shape (k, M)
@@ -108,30 +106,24 @@ class ProductQuantization:
         for n in range(N):  # For each PQ Code, lookup the partial distances.
             for m in range(M):
                 distances[n] += distance_table[PQ_code[n][m]][m]  # Sum the partial distances from all the segments.
-        #print("Done search")
         
         return distance_table, distances,data_indices,max_penetration_rate
-
-    def run_search(self, penetration_rate: float):
-        start_time = time.time()
+    def run_encoding(self):
+        
         probes_list, probe_embeddings, gallery_list, gallery_embeddings = utils.load_data(self.probes_path, self.gallery_path,
-                                                                                    penetration_rate=penetration_rate)
+                                                                                    penetration_rate=1.0)
         identities = utils.open_tab_separated_file(self.identities_path)
 
         codebook = self.PQ_train(gallery_embeddings, self.num_subspaces, self.num_centroids)
-        PQ_code,tree,tree_1 = pq_model.PQ_encode(gallery_embeddings, codebook)
-
+        PQ_code,tree = pq_model.PQ_encode(gallery_embeddings, codebook)
+        return probe_embeddings,codebook,PQ_code,tree,probes_list,gallery_list,identities
+    def run_search(self, tree_k,probe_embeddings,codebook,PQ_code,tree,probes_list,gallery_list,identities):
+        
+        start_time = time.time()
         identifications = []
         max_penetration_rate=0
         for probe_idx, probe_embedding in enumerate(tqdm(probe_embeddings)):
-            # best_match_idx = None
-            # min_distance = np.inf
-            if probe_idx==0:
-                verbose=1
-            else:
-                verbose=0
-            distance_table, distances,data_indices,max_penetration_rate = pq_model.PQ_search(probe_embedding, codebook, PQ_code,tree,tree_1,5,max_penetration_rate,verbose=verbose)
-            min_distance = np.min(distances)
+            distance_table, distances,data_indices,max_penetration_rate = pq_model.PQ_search(probe_embedding, codebook, PQ_code,tree,tree_k,max_penetration_rate)
             best_match_idx = data_indices[0][np.argmin(distances)]
             identifications.append((probe_idx, best_match_idx))
         print('max penetration rate',max_penetration_rate)
@@ -149,25 +141,7 @@ class ProductQuantization:
         hit_rate = correct_preds / total_preds
         end_time = time.time()
 
-        return hit_rate, end_time - start_time
-
-    """    
-    M = 8  # Number of segments
-    k = 256  # Number of centroids per segment
-    vector_dim = 128  # Dimension (length) of a vector
-    total_vectors = 1000000  # Number of database vectors
-    
-    # Generate random vectors
-    np.random.seed(42)
-    vectors = np.random.random((total_vectors, vector_dim)).astype(np.float32)  # Database vectors
-    q = np.random.random((vector_dim,)).astype(np.float32)  # Query vector
-    
-    # Train, encode and search with Product Quantization
-    codebook = PQ_train(vectors, M, k)
-    PQ_code = PQ_encode(vectors, codebook)
-    distance_table, distances = PQ_search(q, codebook, PQ_code)
-    # All the distances are returned, you may sort them to get the shortest distance.
-    """
+        return hit_rate, end_time - start_time, max_penetration_rate
 
 
 if __name__ == '__main__':
@@ -181,21 +155,25 @@ if __name__ == '__main__':
 
     # probes_list, probe_embeddings, gallery_list, gallery_embeddings = load_data(probes_path, gallery_path, penetration_rate=1.0)
 
-    M = 8  # Number of subspaces
+    M = 4  # Number of subspaces
     k = 256  # Number of centroids per subspace
-
+    tree_k=1
     pq_model = ProductQuantization(num_subspaces=M, num_centroids=k, identities_path=identities_path, probes_path=probes_path, gallery_path=gallery_path)
-
+    probe_embeddings,codebook,PQ_code,tree,probes_list,gallery_list,identities=pq_model.run_encoding()
     hit_rates = []
     penetration_rates = []
-    for penetration_rate in np.arange(1.0, 1.01, 0.02):  # step=0.01
-        penetration_rate = np.around(penetration_rate, 2)
-        print('penetration_rate= ' + str(penetration_rate))
-        hit_rate, time_ran = pq_model.run_search(penetration_rate)
+    max_penetration_rate=0
+    while max_penetration_rate<0.8:
+        print('nearest neighbour= ' + str(tree_k))
+        hit_rate, time_ran,max_penetration_rate = pq_model.run_search(tree_k,probe_embeddings,codebook,PQ_code,tree,probes_list,gallery_list,identities)
         print('hit_rate= ' + str(hit_rate))
         hit_rates.append(hit_rate)
-        penetration_rates.append(penetration_rate)
+        penetration_rates.append(max_penetration_rate)
         total_time_ran += time_ran
+        if tree_k==1:
+            tree_k+=9
+        else:
+            tree_k+=10
     print(f"Total time ran: {total_time_ran}")
     root_name = 'product_quantization' + str(seed)
     np.save(root_name + '_penetration_rates.npy', np.array(penetration_rates))
@@ -203,6 +181,6 @@ if __name__ == '__main__':
     plt.plot(penetration_rates, hit_rates)
     plt.xlabel('Penetration Rate')
     plt.ylabel('Hit Rate')
-    plt.savefig('Random_Indexing.png')
+    plt.savefig('PQ_with_kdtree.png')
     plt.show()
 
